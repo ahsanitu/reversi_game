@@ -14,11 +14,15 @@ void drawMenu(sf::RenderWindow& window);
 bool exitButton(sf::RenderWindow& window, sf::Event& event);
 bool newGameButton(sf::RenderWindow& window, sf::Event& event);
 bool loadGameButton(sf::RenderWindow& window, sf::Event& event);
+bool singlePlayerButton(sf::RenderWindow& window, sf::Event& event);
 char checkWinner();
 bool checkGameOver();
 void handleClick(int x, int y, CELLSTATE currentPlayer);
 void flipPieces(int row, int col, CELLSTATE currentPlayer);
 void drawBoard(sf::RenderWindow& window);
+void computerMove(CELLSTATE currentPlayer);
+int flipPieceSimulator(int row, int col, CELLSTATE currentPlayer);
+int simulateMove(int row, int col, CELLSTATE currentPlayer);
 
 int main() {
 
@@ -27,11 +31,15 @@ int main() {
 	RenderWindow window(VideoMode(WINDOW_SIZE, WINDOW_SIZE), "REVERSI");
 
 	CELLSTATE currentPlayer = WHITE; 
+
+	bool flagForComputer = false;
 	
 
 	while (window.isOpen()) { // MENU FOR ASKING OPTION
 
 		Event event;
+
+		
 
 		while (window.pollEvent(event)) {
 
@@ -91,6 +99,22 @@ int main() {
 			window.close();
 
 		}
+		if (singlePlayerButton(window, event)) {
+			
+			flagForComputer = true;
+
+			for (int i = 0; i < 8; i++) {
+				for (int j = 0; j < 8; j++) {
+					board[i][j] = NONE;
+				}
+			}
+			board[3][3] = WHITE;
+			board[3][4] = BLACK;
+			board[4][4] = WHITE;
+			board[4][3] = BLACK;
+
+			window.close();
+		}
 
 		window.display();
 
@@ -112,6 +136,21 @@ int main() {
 		
 		               
 		                currentPlayer = (currentPlayer == WHITE) ? BLACK : WHITE;
+
+						drawBoard(window2);
+						window2.display();
+
+						if (flagForComputer) {
+
+							sf::Clock clock;
+							while (clock.getElapsedTime().asSeconds() < 1) {
+								
+								// This is to hold screen
+							}
+							
+							computerMove(currentPlayer);
+							currentPlayer = (currentPlayer == WHITE) ? BLACK : WHITE;
+						}
 		            }
 					if (event.type == sf::Event::KeyPressed) {
 						if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl) &&
@@ -134,7 +173,8 @@ int main() {
 						}
 					}
 		        }
-		
+				
+				
 		        window2.clear();
 		        drawBoard(window2);
 		        window2.display();
@@ -205,7 +245,7 @@ bool exitButton(sf::RenderWindow& window , sf::Event& event) {
 	RectangleShape button(Vector2f(100, 50));
 
 	button.setFillColor(Color::Transparent);
-	button.setPosition(WINDOW_SIZE / 4 + 190, WINDOW_SIZE / 2 + 100);
+	button.setPosition(WINDOW_SIZE / 4 + 190, WINDOW_SIZE / 2 + 200);
 	window.draw(button);
 
 	// Create text
@@ -250,6 +290,61 @@ bool exitButton(sf::RenderWindow& window , sf::Event& event) {
 	}
 	return false;
 }
+
+bool singlePlayerButton(sf::RenderWindow& window, sf::Event& event) {
+
+	using namespace sf;
+
+	// Create button
+	RectangleShape button(Vector2f(120, 50));
+
+	button.setFillColor(Color::Transparent);
+	button.setPosition(WINDOW_SIZE / 4 + 190, WINDOW_SIZE / 2 + 100);
+	window.draw(button);
+
+	// Create text
+
+	Font font;
+	font.loadFromFile("font.ttf");
+	Text buttonText;
+	buttonText.setFont(font);
+	buttonText.setString("1 PLAYER");
+	buttonText.setCharacterSize(30);
+	buttonText.setFillColor(sf::Color::White);
+
+	// Center the text in the rectangle
+
+	FloatRect textBounds = buttonText.getLocalBounds();
+	FloatRect buttonBounds = button.getGlobalBounds();
+
+	buttonText.setPosition(
+		buttonBounds.left + (buttonBounds.width - textBounds.width) / 2 - textBounds.left,
+		buttonBounds.top + (buttonBounds.height - textBounds.height) / 2 - textBounds.top
+	);
+
+	window.draw(buttonText);
+
+
+	if (event.type == sf::Event::MouseButtonPressed) {
+		if (event.mouseButton.button == sf::Mouse::Left) {
+			// Get mouse position
+			sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+
+			// Check if the mouse is within the button's bounds
+			if (button.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+
+				return true;
+
+
+
+			}
+			return false;
+		}
+		return false;
+	}
+	return false;
+}
+
 
 bool newGameButton(sf::RenderWindow& window, sf::Event& event) {
 
@@ -456,4 +551,136 @@ void drawBoard(sf::RenderWindow& window) {
             }
         }
     }
+}
+
+void computerMove(CELLSTATE currentPlayer) {
+	
+	int bestX = -1;
+	int bestY = -1;
+	
+
+	int maxFlip = 0;
+	int temp;
+
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 8; j++) {
+
+			if (board[i][j] == NONE) {
+
+				temp = simulateMove(i, j, currentPlayer);
+
+				if (temp > maxFlip) {
+					bestY = i;
+					bestX = j;
+					maxFlip = temp;
+				}
+			}
+		}
+	}
+
+	if (bestX < 0 || bestY < 0) {
+		bool flag = true;
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				if (board[i][j] != currentPlayer && board[i][j] != NONE) {
+
+					int directions[8][2] = {
+
+						{-1, 0}, {1, 0}, {0, -1}, {0, 1}, // horizontal & vertical
+						{-1, -1}, {1, 1}, {-1, 1}, {1, -1} // diagonals
+
+					};
+
+
+
+					for (int* direction : directions) {
+						int dirX = direction[0];
+						int dirY = direction[1];
+						int x = j + dirX, y = i + dirY;
+
+						if (board[y][x] == NONE) {
+							bestX = x;
+							bestY = y;
+							flag = false;
+							break;
+						}
+					}
+
+				}
+				if (!flag)
+					break;
+
+			}
+			if (!flag)
+				break;
+		}
+	}
+
+	if (bestX < 0 || bestY < 0) {
+		bool flag = true;
+
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				if (board[i][j] == NONE) {
+					bestX = j;
+					bestY = i;
+					flag = false;
+					break;
+				}
+
+			}
+			if (!flag)
+				break;
+		}
+	}
+
+	board[bestY][bestX] = currentPlayer;
+	flipPieces(bestY, bestX, currentPlayer);
+}
+
+int simulateMove(int row, int col, CELLSTATE currentPlayer) { // RETURNS THE NUMBER OF PEICES FLIPPED
+
+	board[row][col] = currentPlayer;
+	int count = flipPieceSimulator(row, col, currentPlayer);
+	board[row][col] = NONE;
+
+	return count;
+	
+}
+
+int flipPieceSimulator(int row, int col , CELLSTATE currentPlayer) { // ROW COL IS THE COORDINATE WHERE THE PIECE IS PLACED. RETURNS THE NUMBER OF PIECES FLIPPED
+
+	int directions[8][2] = {
+		   {-1, 0}, {1, 0}, {0, -1}, {0, 1}, // horizontal & vertical
+		   {-1, -1}, {1, 1}, {-1, 1}, {1, -1} // diagonals
+	};
+
+	int count = 0;
+
+	for (int* direction : directions) {
+		int dirX = direction[0];
+		int dirY = direction[1];
+		int x = col + dirX, y = row + dirY;
+
+		while (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE && board[y][x] != NONE) {
+			if (board[y][x] == currentPlayer) {
+				
+				// DONT FLIP JUST COUNT THE NUMBERS THAT WILL BE FLIPPED
+
+				int tempX = col + dirX, tempY = row + dirY;
+				while (tempX != x || tempY != y) {
+					
+					count++;
+
+					tempX += dirX;
+					tempY += dirY;
+				}
+				break;
+			}
+			x += dirX;
+			y += dirY;
+		}
+	}
+
+	return count;
 }
